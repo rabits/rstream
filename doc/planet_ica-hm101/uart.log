@@ -1,0 +1,431 @@
+MP SPI-NOR Bootstrap v0.2
+Boot image offset: 0x6000. Booting Image .....
+0567Will set the following freq...
+PLL1: 800 MHz, PLL2: 540 MHz, CPU freq: 540 MHz, AHB freq: 270 MHz, DDR freq: 800 MHz
+go...
+
+*********************************************
+Please input Space to run Linux
+Please input ESC to run UBOOT
+Please input . to run burn-in
+Otherwise, system will run Linux after 5 sec
+*********************************************
+Load image from SPI-NOR offset 0xd6000 to sdram 0x4000000
+Jump 0x4000000
+Uncompressing Linux............................................................................................................................................................................................................................................................................................................................................................................................................................... done, booting the kernel.
+Linux version 2.6.28 (root@tomhost.domain.com) (gcc version 4.4.0 (Faraday C/C++ Compiler Release 20100325) ) #159 PREEMPT Wed May 9 19:33:59 CST 2012
+CPU: FA626TE [66056261] revision 1 (ARMv5TE), cr=0000797f
+CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
+Machine: Faraday GM8126
+Warning: bad configuration page, trying to continue
+Memory policy: ECC disabled, Data cache writeback
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 65024
+Kernel command line: mem=256M console=uart,shift,2,io,0xF9830000,38400
+Early serial console at I/O port 0xf9830000 (options '38400', shift 2)
+console [uart0] enabled
+PID hash table entries: 1024 (order: 10, 4096 bytes)
+IC: GM8128 MP
+GM Clock: CPU = 540 MHz, AHBCLK = 270 MHz, PLL1CLK = 800 MHz, PLL2CLK = 540 MHz
+console handover: boot [uart0] -> real [ttyS0]
+Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
+Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
+Memory: 256MB = 256MB total
+Memory: 246272KB available (4327K code, 384K data, 8680K init)
+Calibrating delay loop... 534.52 BogoMIPS (lpj=267264)
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+net_namespace: 652 bytes
+Fmem: node 0 is online, alloc pages = 45056(active pages = 65536)
+high_memory:0xd0000000, VM Start:0xd0800000, End:0xe0000000 
+NET: Registered protocol family 16
+PMU: Mapped at 0xf9900000 
+pmu_get_cpu_clk:179 <fclk_mode=2, pll2_out=540000000>
+Attach GM AHB-DMA Driver
+SCSI subsystem initialized
+usbcore: registered new interface driver usbfs
+usbcore: registered new interface driver hub
+usbcore: registered new device driver usb
+cfg80211: Using static regulatory domain info
+cfg80211: Regulatory domain: US
+	(start_freq - end_freq @ bandwidth), (max_antenna_gain, max_eirp)
+	(2402000 KHz - 2472000 KHz @ 40000 KHz), (600 mBi, 2700 mBm)
+	(5170000 KHz - 5190000 KHz @ 40000 KHz), (600 mBi, 2300 mBm)
+	(5190000 KHz - 5210000 KHz @ 40000 KHz), (600 mBi, 2300 mBm)
+	(5210000 KHz - 5230000 KHz @ 40000 KHz), (600 mBi, 2300 mBm)
+	(5230000 KHz - 5330000 KHz @ 40000 KHz), (600 mBi, 2300 mBm)
+	(5735000 KHz - 5835000 KHz @ 40000 KHz), (600 mBi, 3000 mBm)
+cfg80211: Calling CRDA for country: US
+NET: Registered protocol family 2
+IP route cache hash table entries: 2048 (order: 1, 8192 bytes)
+TCP established hash table entries: 8192 (order: 4, 65536 bytes)
+TCP bind hash table entries: 8192 (order: 3, 32768 bytes)
+TCP: Hash tables configured (established 8192 bind 8192)
+TCP reno registered
+NET: Registered protocol family 1
+Video Timer(timer3) Max 31000ms in 0xf9720840 HZ.
+JFFS2 version 2.2. (NAND) ┬й 2001-2006 Red Hat, Inc.
+msgmni has been set to 481
+alg: No test for stdrng (krng)
+io scheduler noop registered
+io scheduler anticipatory registered (default)
+io scheduler deadline registered
+io scheduler cfq registered
+probe ftgpio010.0 OK!!, at d089c000
+probe ftgpio010.1 OK!!, at d08a0000
+probe ftgpio010.2 OK!!, at d08a4000
+Serial: 8250/16550 driver 4 ports, IRQ sharing disabled
+serial8250: ttyS0 at I/O 0xf9830000 (irq = 9) is a 16550A
+serial8250: ttyS1 at I/O 0xf9840000 (irq = 10) is a 16550A
+serial8250: ttyS3 at I/O 0xf9890000 (irq = 22) is a 16550A
+brd: module loaded
+loop: module loaded
+PPP generic driver version 2.4.2
+NET: Registered protocol family 24
+rtl8150: v0.6.2 (2004/08/27):rtl8150 based usb-ethernet driver
+usbcore: registered new interface driver rtl8150
+usbcore: registered new interface driver asix
+usbcore: registered new interface driver cdc_ether
+usbcore: registered new interface driver net1080
+usbcore: registered new interface driver cdc_subset
+usbcore: registered new interface driver zaurus
+libertas_sdio: Libertas SDIO driver
+libertas_sdio: Copyright Pierre Ossman
+Linux video capture interface: v2.00
+Driver 'sd' needs updating - please use bus_type methods
+Driver 'sr' needs updating - please use bus_type methods
+Creating 6 MTD partitions on "wb_spi_flash":
+0x000d6000-0x00eff000 : "Linux Section"
+0x00f00000-0x01000000 : "User Section"
+0x00001000-0x00006000 : "Loader Section"
+0x00006000-0x000a6000 : "BurnIn Section"
+0x000a6000-0x000d4000 : "UBoot Section"
+0x000d4000-0x000d6000 : "CFG Section"
+Probe FTSSP010 SPI Controller at 0x98200000 (irq 6)
+Probe FTSSP010 SPI Controller at 0x98600000 (irq 7)
+usbmon: debugfs is not available
+ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+AMBA bus_register ok
+Enter Device A
+temp = 340
+Drive Vbus because of ID pin shows Device A
+otg2xx device_register ok
+AMBA_bus_match(...) Found Driver FOTG2XX_DRV
+AMBA_bus_match(...) Found Driver FOTG2XX_DRV
+FOTG2XX_DRV fotg2xx_dev: GM  USB2.0 Host Controller
+FOTG2XX_DRV fotg2xx_dev: new USB bus registered, assigned bus number 1
+FOTG2XX_DRV fotg2xx_dev: irq 4, io mem 0xf9220000
+FOTG2XX_DRV fotg2xx_dev: USB 2.0 started, EHCI 1.00
+usb usb1: configuration #1 chosen from 1 choice
+hub 1-0:1.0: USB hub found
+hub 1-0:1.0: 1 port detected
+FOTG200 Controller Initialization
+fotg200 int enable = 1f30
+Initializing USB Mass Storage driver...
+usbcore: registered new interface driver usb-storage
+USB Mass Storage support registered.
+mice: PS/2 mouse device common for all mice
+i2c /dev entries driver
+ftiic010 ftiic010.0: irq 18, mapped at d08b4000
+usbcore: registered new interface driver usbhid
+usbhid: v2.6:USB HID core driver
+Advanced Linux Sound Architecture Driver Version 1.0.18rc3.
+ALSA device list:
+  No soundcards found.
+ip_tables: (C) 2000-2006 Netfilter Core Team
+TCP cubic registered
+NET: Registered protocol family 10
+lo: Disabled Privacy Extensions
+Mobile IPv6
+ip6_tables: (C) 2000-2006 Netfilter Core Team
+IPv6 over IPv4 tunneling driver
+sit0: Disabled Privacy Extensions
+ip6tnl0: Disabled Privacy Extensions
+NET: Registered protocol family 17
+RPC: Registered udp transport module.
+RPC: Registered tcp transport module.
+Freeing init memory: 8680K
+Warning: unable to open an initial console.
+nvram: platform_copy_from_nvrampinmux: module license 'GM License' taints kernel.
+Pinmux MODE - pir module
+enable_capture_clkout Pinmux va_base+3c=fbff8194
+enable_capture_clkout Pinmux va_base+3c=ffff8194
+enable_capture_clkout Pinmux va_base+6c=36c417
+enable_capture_clkout Pinmux va_base+6c=34c417
+enable_pwm_clk Pinmux va_base+3c=ffff8194
+enable_pwm_clk Pinmux va_base+3c=ffff8194
+enable_pwm0_func Pinmux va_base+50=5414d400
+enable_pwm1_func Pinmux va_base+50=5414d400
+enable_pwm2_func Pinmux va_base+50=5414d400
+enable_pwm3_func Pinmux va_base+50=5414d400
+GPIO 9 Pinmux va_base+50=5414d400
+GPIO 19 Pinmux va_base+60=248
+GPIO 20 Pinmux va_base+60=240
+GPIO 21 Pinmux va_base+60=200
+GPIO 22 Pinmux va_base+60=0
+GPIO 27 Pinmux va_base+60=1000
+GPIO 29 Pinmux va_base+60=11000
+GPIO 30 Pinmux va_base+60=51000
+GPIO 1:14 Pinmux va_base+58=0
+GPIO 1:14 Pinmux va_base+58=0
+GPIO 1:15 Pinmux va_base+58=0
+GPIO 1:15 Pinmux va_base+58=0
+GPIO 1:16 Pinmux va_base+58=0
+GPIO 1:16 Pinmux va_base+58=0
+GPIO 1:17 Pinmux va_base+58=0
+GPIO 1:17 Pinmux va_base+58=0
+GPIO 2:13 Pinmux va_base+5c=50000000
+Pinmux va_base+5c=40000000
+GPIO 20 gpio_va_base+18=fe7ffdff
+GPIO 20 gpio_va_base+1c=fe77fff3
+GPIO 2:13 Pinmux va_base+5c=40000000
+Pinmux va_base+5c=40000000
+enable_EDP_LINKLED Pinmux va_base+5c=40000000
+Disable console 50=5414d500
+GPIO 4 gpio_va_base+18=fe7ffdff
+GPIO 4 gpio_va_base+1c=fe77fff3
+ftwdt101dog_init
+mmc0: SDHCI controller on <NULL> [ftsdc010] using DMA
+
+Frammap: 9216 pages in DDR0 are freed. 
+Frammap: DDR0: memory base=0x3800000, memory size=0x8c00000, alignment=256K 
+Frammap: version 0.28.3, 1 DDR is managed. 
+
+VideoGraph v0.44 You may use
+   #echo 11 > /proc/videograph/dbg
+to enable debug mode (0xbf05050c)
+Debug message at 0xd0b02000 start pointer 0xbf0705f0 size 0x124f80
+Insert dvr_common driver done.
+Platform GM812600 
+    enc_in0=(buf: 3891200,4,0)
+    enc_in0_d=(buf: 3891200,4,1)
+    enc_out0=(res: 1600,1216)
+    enc_out0=(buf: 1653760,4,0)
+    sub1_enc_out0=(res: 1600,1216)
+    sub1_enc_out0=(buf: 1653760,3,0)
+    sub2_enc_out0=(res: 1600,1216)
+    sub2_enc_out0=(buf: 1653760,3,0)
+    sub3_enc_out0=(res: 1600,1216)
+    sub3_enc_out0=(buf: 1653760,3,0)
+    sub4_enc_out0=(res: 1600,1216)
+    sub4_enc_out0=(buf: 1653760,3,0)
+    enc_in1=(buf: 614400,4,0)
+    enc_in1_d=(buf: 614400,4,1)
+    enc_out1=(res: 640,480)
+    enc_out1=(buf: 353280,4,0)
+    sub1_enc_out1=(res: 640,480)
+    sub1_enc_out1=(buf: 353280,3,0)
+    sub2_enc_out1=(res: 640,480)
+    sub2_enc_out1=(buf: 353280,3,0)
+    sub3_enc_out1=(res: 640,480)
+    sub3_enc_out1=(buf: 353280,3,0)
+    sub4_enc_out1=(res: 640,480)
+    sub4_enc_out1=(buf: 353280,3,0)
+    enc_in2=(buf: 460800,4,0)
+    enc_in2_d=(buf: 460800,4,1)
+    enc_out2=(res: 320,240)
+    enc_out2=(buf: 88320,4,0)
+    sub1_enc_out2=(res: 320,240)
+    sub1_enc_out2=(buf: 88320,3,0)
+    sub2_enc_out2=(res: 320,240)
+    sub2_enc_out2=(buf: 88320,3,0)
+    sub3_enc_out2=(res: 320,240)
+    sub3_enc_out2=(buf: 88320,3,0)
+    sub4_enc_out2=(res: 320,240)
+    sub4_enc_out2=(buf: 88320,3,0)
+    enc_in3=(buf: 40960,4,0)
+    enc_in3_d=(buf: 40960,4,1)
+    enc_out3=(res: 160,128)
+    enc_out3=(buf: 40960,4,0)
+    sub1_enc_out3=(res: 160,128)
+    sub1_enc_out3=(buf: 23552,3,0)
+    sub2_enc_out3=(res: 160,128)
+    sub2_enc_out3=(buf: 23552,3,0)
+    sub3_enc_out3=(res: 160,128)
+    sub3_enc_out3=(buf: 23552,3,0)
+    sub4_enc_out3=(res: 160,128)
+    sub4_enc_out3=(buf: 23552,3,0)
+    sub5_enc_out3=(res: 160,128)
+    sub5_enc_out3=(buf: 23552,3,0)
+    sub6_enc_out3=(res: 160,128)
+    sub6_enc_out3=(buf: 23552,3,0)
+    lcd=(buf: 614400,8,0)
+Note: create lcd queue with Pattern 0x98654312
+    lcd_d=(buf: 614400,8,1)
+Insert dvr_disp driver done.
+
+LCD platform: Hook GM8126 driver.
+GM_ffb: [ver:0.1.14]INIT flcd200 OK.
+LCD0 VA = 0xd09d0000, size:0xd000 bytes 
+LCD0: Output resolution is D1 NTSC. 
+Register codec TVE100. 
+LCD: Input resolution is 640x360 
+LCD0: Standard: 27.0MHZ 
+LCD0: PVALUE = 19, pixel clock = 27.0MHZ, scalar clock = 108MHZ 
+LCD driver[Ver: 1.1.0] init ok. 
+enable_tv_clkout Pinmux va_base+6c=74c417
+enable_tv_clkout Pinmux va_base+6c=74c417
+enable_tv_dac Pinmux va_base+7c=9c633000
+enable_tv_dac Pinmux va_base+7c=9c63300c
+fcap: V0.3.12
+vcap_dev: [0]:bAlbum_bug=0, bCrop_bug=1, bCU_bug=0
+		LL_BusDeadlock_bug=0, bSupportSplitOSDDispRamWritePort=1
+
+fcap: [0]: Link List mode!
+fcap: fosd00: minor=55
+fcap: fosd02: minor=54
+fcap: fosd01: minor=53
+fcap: fosd03: minor=52
+vcap_dev: [1]:bAlbum_bug=0, bCrop_bug=1, bCU_bug=0
+		LL_BusDeadlock_bug=0, bSupportSplitOSDDispRamWritePort=1
+
+fcap: [1]: Link List mode!
+fcap: fosd10: minor=51
+fcap: fosd12: minor=50
+fcap: fosd11: minor=49
+fcap: fosd13: minor=48
+probe mt9d131 i2c OK.
+Capture Clock Out = 27000000
+(UXGA)SCL: Version, v1.16
+SCL: div:4
+MCP100 driver with CPU for VG
+Note: Disable H264 decoder
+FAVC Encoder IRQ mode(29)v4.1.11
+FAVC codec Max Resolution is 1600x1200, built @ Oct 20 2011 09:13:19
+GM8126 MPEG4 with CPU for VG, decoder ver: 3.2.1, encoder ver: 3.2.6
+GM8126 MJPEG with CPU for VG, encoder ver: 3.2.4, decoder ver: 3.1.3
+
+FTDI210 registers 32 entities to video graph! 
+FTDI210 Driver v1.4 (1 engine(s)) 
+ftrtc011 ftrtc011: rtc core: registered ftrtc011 as rtc0
+ft-32ssp: common[ver:0.3.4] INIT OK!
+card->cardno = 2
+card->pbase = 98a00000
+card->vbase = d0d92000
+card->irq = 11
+my_card->capture.dma_ch = 4
+my_card->playback.dma_ch = 5
+ft-32ssp: SoundCard(2) attached OK (c23a4dd0)
+I2S probe ok in Slave mode.
+
+init_security
+Security physical address = 0x92700000, virtual address = 0xd0d9a000
+Register AES/DES OK
+FTMAC with FARADAY Internal PHY support
+FTMAC110 Driver (Linux 2.6) 01/10/11 - (C) 2011 GM Corp.
+reset Faraday Internal PHY.
+WDT base virtual address = d0dac000
+pre_margin = 0x2625A000
+ADDR: 00:30:4f:9d:cd:c8 
+ftmac110_link_change:2168 <SPEED100>
+ftmac110_link_change:2182 <FULL>
+ftmac110_link_change:2168 <SPEED100>
+ftmac110_link_change:2182 <FULL>
+GPIO 2:13 Pinmux va_base+5c=50000055
+Pinmux va_base+5c=40000055
+enable_EDP_LINKLED Pinmux va_base+5c=40000055
+mode = 0
+mode = 2
+mode = 1080
+mode = 2080
+volume 53 mode 2080
+volume 53 SPV eb57e79
+~ # 
+vsrc_number=0, max_frame_rate=15
+fcap: [0]:OSD P0 default fonts num=42
+
+fcap: [0]:OSD P1 default fonts num=42
+
+fcap: [1]:OSD P0 default fonts num=42
+
+fcap: [1]:OSD P1 default fonts num=42
+
+
+H264 rate control version: fix 0.95
+
+MP4 rate control version: fix 0.95
+Platform 8126 version 81262120
+fcap: [0]:IN=MT9D131
+Platform 8126 version 81262120
+fcap: [1]:IN=MT9D131
+(dataout_21) Timeout to wait AP buffer get, skip! (0xf9e7,0xfac5 flow 198)
+(dataout_5) Timeout to wait AP buffer get, skip! (0xfa0a,0xfb03 flow 240)
+(dataout_15) Timeout to wait AP buffer get, skip! (0xfa10,0xfb19 flow 198)
+(dataout_20) Timeout to wait AP buffer get, skip! (0xfa16,0xfb41 flow 198)
+(dataout_21) Timeout to wait AP buffer get, skip! (0xfa21,0xfb5d flow 198)
+(dataout_22) Timeout to wait AP buffer get, skip! (0xf9ed,0xfb82 flow 396)
+(dataout_23) Timeout to wait AP buffer get, skip! (0xf9ee,0xfb98 flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0xf9ee,0xfbb8 flow 396)
+(dataout_33) Timeout to wait AP buffer get, skip! (0xf9ef,0xfbd6 flow 396)
+(dataout_0) Timeout to wait AP buffer get, skip! (0xf9e7,0xfc14 flow 320)
+
+##### Transfer Group 0 Done,973ms!
+
+##### Transfer Group 3 Done,989ms!
+
+##### Transfer Group 2 Done,1005ms!
+
+##### Transfer Group 0 Done,817ms!
+
+##### Transfer Group 1 Done,760ms!
+
+##### Transfer Group 0 Done,732ms!
+
+##### Transfer Group 0 Done,731ms!
+
+##### Transfer Group 1 Done,755ms!
+
+##### Transfer Group 1 Done,576ms!
+__ratelimit: 257 callbacks suppressed
+(dataout_22) Timeout to wait AP buffer get, skip! (0xce8,0xe8a flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0xd08,0xead flow 396)
+(dataout_33) Timeout to wait AP buffer get, skip! (0xd0a,0xec3 flow 396)
+(dataout_2) Timeout to wait AP buffer get, skip! (0xcd1,0xef7 flow 528)
+(dataout_15) Timeout to wait AP buffer get, skip! (0xdd8,0xf0c flow 198)
+(dataout_17) Timeout to wait AP buffer get, skip! (0xd43,0xf24 flow 396)
+(dataout_18) Timeout to wait AP buffer get, skip! (0xd9c,0xf3a flow 396)
+(dataout_22) Timeout to wait AP buffer get, skip! (0xd44,0xf4f flow 396)
+(dataout_23) Timeout to wait AP buffer get, skip! (0xd4b,0xf66 flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0xd4b,0xf84 flow 396)
+
+##### Transfer Group 1 Done,438ms!
+
+##### Transfer Group 1 Done,204ms!
+
+##### Transfer Group 2 Done,1059ms!
+
+##### Transfer Group 2 Done,1177ms!
+
+##### Transfer Group 2 Done,1146ms!
+
+##### Transfer Group 2 Done,381ms!
+
+##### Transfer Group 2 Done,249ms!
+__ratelimit: 155 callbacks suppressed
+(dataout_15) Timeout to wait AP buffer get, skip! (0x2195,0x2266 flow 198)
+(dataout_28) Timeout to wait AP buffer get, skip! (0x2179,0x231d flow 396)
+(dataout_33) Timeout to wait AP buffer get, skip! (0x2178,0x2335 flow 396)
+(dataout_0) Timeout to wait AP buffer get, skip! (0x21f3,0x236b flow 320)
+(dataout_23) Timeout to wait AP buffer get, skip! (0x21b6,0x2382 flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0x21b7,0x2399 flow 396)
+(dataout_15) Timeout to wait AP buffer get, skip! (0x2303,0x23cd flow 198)
+(dataout_18) Timeout to wait AP buffer get, skip! (0x21fa,0x23e3 flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0x21f4,0x23f8 flow 396)
+(dataout_28) Timeout to wait AP buffer get, skip! (0x234e,0x24e0 flow 396)
+
+##### Transfer Group 3 Done,1260ms!
+
+##### Transfer Group 3 Done,741ms!
+
+##### Transfer Group 3 Done,920ms!
+
+##### Transfer Group 3 Done,1100ms!
+
+##### Transfer Group 3 Done,282ms!
+
+##### Transfer Group 3 Done,573ms!
+
+##### Transfer Group 0 Done,491ms!
+
+##### Transfer Group 0 Done,80ms!
+
+##### Transfer Group 0 Done,365ms!

@@ -1,0 +1,8 @@
+# cat /proc/mtd 
+dev:    size   erasesize  name
+mtd0: 00e29000 00001000 "Linux Section"
+mtd1: 00100000 00001000 "User Section"
+mtd2: 00005000 00001000 "Loader Section"
+mtd3: 000a0000 00001000 "BurnIn Section"
+mtd4: 00030000 00001000 "UBoot Section"
+mtd5: 00020000 00001000 "CFG Section"
