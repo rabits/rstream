@@ -18,26 +18,24 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 
 def error(message):
-    stderr.write('ERROR: ' + message)
+    stderr.write('[ERROR]: ' + message)
 
 def info(message):
     if( options['verbose'] != False ):
-        print('INFO: ' + message)
+        print('[INFO]: ' + message)
 
 def debug(message):
     if( options['verbose'] == True ):
-        print('DEBUG: ' + message)
+        print('[DEBUG]: ' + message)
 
 # Init optparse
 parser = OptionParser(usage='usage: %prog [options] rtsp://url/h264', version=__doc__.split('\n', 1)[0])
-parser.add_option('-o', '--output-dir', dest='output-dir', metavar='DIR',
-        default='out/%Y-%m-%d', help='autocreated output directory for files (accept date vars) ["%default"]')
-parser.add_option('-f', '--file-name', dest='file-name', metavar='NAME',
-        default='stream-%H%M', help='name of file (accept date vars) ["%default"]')
-parser.add_option('-d', '--duration-limit', dest='time-limit', metavar='MIN',
-        default=30, help='limit of video file duration in minutes [%default]')
-parser.add_option('-s', '--size-limit', dest='size-limit', metavar='MB',
-        default=0, help='limit of video file size in megabytes [%default]')
+parser.add_option('-o', '--output-dir', type='string', dest='output-dir', metavar='DIR',
+        default='out/%Y-%m-%d', help='autocreated output directory for files (accept `date` vars) ["%default"]')
+parser.add_option('-f', '--file-name', type='string', dest='file-name', metavar='NAME',
+        default='stream-%s', help='name of output files (accept `date` vars) ["%default"]')
+parser.add_option('-d', '--duration-limit', type='int', dest='duration-limit', metavar='MIN',
+        default=30, help='limit of video file duration in minutes (0 - no file cutting) [%default]')
 parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
         help='verbose mode - moar output to stdout')
 parser.add_option('-q', '--quet', action='store_false', dest='verbose',
@@ -139,13 +137,15 @@ class RStream:
         self.video = VideoEncoder()
         self.audio = AudioEncoder()
         self.mux = Gst.ElementFactory.make('mpegtsmux', None)
-        self.sink =  Gst.ElementFactory.make('filesink', None)
+        self.tee = Gst.ElementFactory.make('tee', None)
+        self.sink = Gst.ElementFactory.make('filesink', None)
 
         # Add elements to pipeline
         self.pipeline.add(self.src)
         self.pipeline.add(self.video)
         self.pipeline.add(self.audio)
         self.pipeline.add(self.mux)
+        self.pipeline.add(self.tee)
         self.pipeline.add(self.sink)
 
         # Set properties
@@ -159,7 +159,17 @@ class RStream:
         # Link elements
         self.video.link(self.mux)
         self.audio.link(self.mux)
-        self.mux.link(self.sink)
+        self.mux.link(self.tee)
+        self.tee.link(self.sink)
+
+        if options['duration-limit'] > 0:
+            GObject.timeout_add(options['duration-limit'] * 60 * 1000, self.relocate)
+
+    def relocate(self):
+        newpath = self.outputPath()
+        info('Changing file location to "%s"' % newpath)
+        self.location(newpath)
+        return True
 
     def outputPath(self):
         curr_date = datetime.now()
@@ -173,11 +183,15 @@ class RStream:
 
     def run(self):
         self.pipeline.set_state(Gst.State.PLAYING)
-        self.mainloop.run()
+        try:
+            self.mainloop.run()
+        except KeyboardInterrupt:
+            self.on_eos(None,None)
 
     def kill(self):
         self.pipeline.set_state(Gst.State.NULL)
         self.mainloop.quit()
+        self.bus.remove_signal_watch()
 
     def on_pad_added(self, element, pad):
         string = pad.query_caps(None).to_string()
@@ -197,6 +211,15 @@ class RStream:
     def on_error(self, bus, msg):
         error(' '.join(map(str,msg.parse_error())))
         self.kill()
+
+    def location(self, filename):
+        self.sink.set_state(Gst.State.NULL)
+        self.sink.set_property('location', filename)
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def eos(self):
+        self.bus.add_signal_watch()
+        self.pipeline.send_event(gst.event_new_eos())
 
 rstream = RStream()
 rstream.run()
