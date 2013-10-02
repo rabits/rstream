@@ -15,6 +15,7 @@ rStream - IP video manager
 ### Beward BD4330r
 * Video+Audio: rtsp://ip/h264
 * Video2+Audio: rtsp://ip/h264_2
+* Reboot: http://ip/cgi-bin/admin/restart.cgi?button=Reboot
 
 ### Planet ICA-HM101
 * 1600x1200 90 Video+Audio: rtsp://ip/media.amp?streamprofile=Profile1
