@@ -1,5 +1,5 @@
 #!/usr/bin/python
-'''rStream 0.6
+'''rStream 0.7
 
 Author:      Rabit <home@rabits.org>
 Description: Script get rtsp stream and save it to separated files
@@ -8,9 +8,9 @@ Usage:
   $ ./rstream.py --help
 '''
 
-from sys import stderr
-import os, time
-from datetime import datetime
+from sys import stderr, stdout
+import os, time, urlparse
+import urllib2, base64
 from optparse import OptionParser
 
 import gi
@@ -19,12 +19,20 @@ from gi.repository import GObject, Gst
 
 # Init optparse
 parser = OptionParser(usage='usage: %prog [options] rtsp://url/h264', version=__doc__.split('\n', 1)[0])
+parser.add_option('-u', '--user', type='string', dest='user', metavar='USER',
+        default=None, help='http basic auth username [%default]')
+parser.add_option('-p', '--password', type='string', dest='password', metavar='PASSWORD',
+        default='', help='http basic auth password ["%default"]')
 parser.add_option('-o', '--output-dir', type='string', dest='output-dir', metavar='DIR',
         default='out/%Y-%m-%d', help='autocreated output directory for files (accept `date` vars) ["%default"]')
 parser.add_option('-f', '--file-name', type='string', dest='file-name', metavar='NAME',
         default='stream-%s', help='name of output files (accept `date` vars) ["%default"]')
 parser.add_option('-d', '--duration-limit', type='int', dest='duration-limit', metavar='MIN',
         default=30, help='limit of video file duration in minutes (0 - no file cutting) [%default]')
+parser.add_option('-r', '--reset-url', type='string', dest='reset-url', metavar='URL',
+        default=None, help='get request will be sent to this url to resetting device [%default]')
+parser.add_option('-l', '--log-file', type='string', dest='log-file', metavar='FILE',
+        default=None, help='copy log output to file [%default]')
 parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
         help='verbose mode - moar output to stdout')
 parser.add_option('-q', '--quiet', action='store_false', dest='verbose',
@@ -36,28 +44,38 @@ if len(args) != 1:
     parser.error("incorrect number of arguments")
 
 # LOGGING
+if( options['log-file'] != None ):
+    class Tee(object):
+        def __init__(self, *files):
+            self.files = files
+        def write(self, obj):
+            for f in self.files:
+                f.write(obj)
+                f.flush()
+
+    logfile = open(options['log-file'], 'a')
+    stdout = Tee(stdout, logfile)
+    stderr = Tee(stderr, logfile)
+
 if( options['verbose'] == True ):
     import inspect
     def log(logtype, message):
         func = inspect.currentframe().f_back
-        curr_date = datetime.now()
         if( logtype != "ERROR" ):
-            print('[%s %s, line:%u]: %s' % (curr_date.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
+            stdout.write('[%s %s, line:%u]: %s\n' % (time.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
         else:
-            stderr.write('[%s %s, line:%u]: %s' % (curr_date.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
+            stderr.write('[%s %s, line:%u]: %s\n' % (time.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
 elif( options['verbose'] == False ):
     def log(logtype, message):
         if( logtype == "ERROR" ):
-            curr_date = datetime.now()
-            stderr.write('[%s %s]: %s' % (curr_date.strftime('%H:%M:%S'), logtype, message))
+            stderr.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
 else:
     def log(logtype, message):
         if( logtype != "DEBUG" ):
-            curr_date = datetime.now()
             if( logtype != "ERROR" ):
-                print('[%s %s]: %s' % (curr_date.strftime('%H:%M:%S'), logtype, message))
+                stdout.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
             else:
-                stderr.write('[%s %s]: %s' % (curr_date.strftime('%H:%M:%S'), logtype, message))
+                stderr.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
 
 # Init gstreamer
 GObject.threads_init()
@@ -75,8 +93,6 @@ class AudioEncoder(Gst.Bin):
         decode = Gst.ElementFactory.make('decodebin', None)
         self.convert = Gst.ElementFactory.make('audioconvert', None)
         resample = Gst.ElementFactory.make('audioresample', None)
-#        enc = Gst.ElementFactory.make('avenc_aac', None)
-#        enc = Gst.ElementFactory.make('voaacenc', None)
         enc = Gst.ElementFactory.make('lamemp3enc', None)
         q2 = Gst.ElementFactory.make('queue', None)
 
@@ -145,9 +161,15 @@ class RStream:
     '''
     def __init__(self):
         log('DEBUG', 'Init streaming')
+        self.exit = False
         self.pipeline = Gst.Pipeline()
         self.bus = self.pipeline.get_bus()
         self.bus.add_signal_watch()
+
+        # Connecting common messages
+        #if( options['verbose'] == True ):
+        #    self.bus.connect('message', self.on_message)
+        self.bus.connect('message::error', self.on_error)
 
         # Create elements
         self.src = Gst.ElementFactory.make('rtspsrc', None)
@@ -188,7 +210,6 @@ class RStream:
         self.eos()
         self.location(self.outputPath())
         GObject.timeout_add(options['duration-limit'] * 60 * 1000, self.relocate)
-        self.run()
 
     def location(self, filename):
         log('INFO', 'Change sink location to %s' % filename)
@@ -199,28 +220,34 @@ class RStream:
         self.pipeline.set_state(Gst.State.READY)
 
     def outputPath(self):
-        curr_date = datetime.now()
-        curr_dir = curr_date.strftime(options['output-dir'])
-        if( not os.path.exists(curr_dir) ):
-            os.makedirs(curr_dir)
-        if( not os.path.isdir(curr_dir) ):
-            log('ERROR', 'Cant create output directory "%s"' % curr_dir)
-        curr_name = curr_date.strftime(options['file-name']) + '.mp4'
-        return os.path.join(curr_dir, curr_name)
+        path = time.strftime(os.path.join(options['output-dir'], options['file-name'])) + '.mp4'
+        directory = os.path.dirname(path)
+        if( not os.path.exists(directory) ):
+            os.makedirs(directory)
+        if( not os.path.isdir(directory) ):
+            log('ERROR', 'Cant create output directory "%s"' % directory)
+        return path
+
+    def start(self):
+        while( self.exit != True ):
+            self.run()
 
     def run(self):
         log('DEBUG', 'Running streaming')
-        if( options['verbose'] == True ):
-            self.bus.connect('message', self.on_message)
-        self.bus.connect('message::error', self.on_error)
         self.sig_eos = self.bus.connect('message::eos', self.on_eos)
+        self.mainloop = GObject.MainLoop()
         self.pipeline.set_state(Gst.State.PLAYING)
-        try:
-            self.mainloop = GObject.MainLoop()
-            self.mainloop.run()
-        except KeyboardInterrupt:
-            log('INFO', 'Received keyboard interrupt. Stopping streaming by EOS')
-            self.stop()
+        # Check that pipeline is ok
+        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
+            log('DEBUG', 'Start receiving stream')
+            try:
+                self.mainloop.run()
+            except KeyboardInterrupt:
+                log('INFO', 'Received keyboard interrupt. Stopping streaming by EOS')
+                self.stop()
+        else:
+            log('ERROR', 'Couldn\'t receive stream')
+            self.reset()
 
     def on_pad_added(self, element, pad):
         string = pad.query_caps(None).to_string()
@@ -236,7 +263,6 @@ class RStream:
     def on_eos(self, bus, msg):
         log('INFO', 'Received end of stream. Restarting streaming...')
         self.location(self.outputPath())
-        self.run()
 
     def on_error(self, bus, msg):
         log('ERROR', 'Received error:' + ' '.join(map(str,msg.parse_error())))
@@ -247,28 +273,66 @@ class RStream:
         message = ' '.join(map(str,getattr(msg,'parse_'+mtype)())) if ( hasattr(msg, 'parse_'+mtype) ) else 'unknown message'
         log('DEBUG', 'Received ' + mtype + ':' + message)
 
+    def reset(self):
+        log('INFO', 'Resetting camera...')
+        # TODO: send email about resetting
+        self.pipeline.set_state(Gst.State.NULL)
+        if( options['reset-url'] != None ):
+            log('DEBUG', 'Send reset request...')
+            request = urllib2.Request(options['reset-url'])
+            if( options['user'] != None ):
+                base64string = base64.encodestring('%s:%s' % (options['user'], options['password'])).replace('\n', '')
+                request.add_header('Authorization', 'Basic %s' % base64string)   
+            try:
+                result = urllib2.urlopen(request)
+                result.close()
+                if( result.getcode() == 200 ):
+                    log('INFO', 'Waiting till camera is up...')
+                    url = urlparse.urlparse(options['reset-url'])
+                    request = urllib2.Request(urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
+                    while( True ):
+                        try:
+                            log('DEBUG', 'Trying connect to %s' % urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
+                            result = urllib2.urlopen(request, None, 1)
+                            result.close()
+                            if( result.getcode() == 200 ):
+                                log('INFO', 'Reset complete!')
+                                return
+                            else:
+                                log('INFO', '  not ready...')
+                        except:
+                            log('INFO', '  waiting...')
+                        time.sleep(1)
+            except urllib2.URLError:
+                log('ERROR', 'Can\'t request camera reset')
+
+        log('ERROR', 'Camera need to reset, but I can\'t do this. Quitting.')
+        self.stop()
+
     def stop(self):
-        self.eos()
+        self.exit = True
+        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
+            self.eos()
         log('INFO', 'Cleaning gstreamer')
         self.pipeline.set_state(Gst.State.NULL)
         self.bus.remove_signal_watch()
-
-    def stop_eos(self, bus, msg):
-        log('INFO', 'EOS is received')
-        self.mainloop.quit()
-        self.bus.disconnect(self.sig_eos)
 
     def eos(self):
         log('DEBUG', 'Sending EOS')
         self.bus.disconnect(self.sig_eos)
         self.sig_eos = self.bus.connect('message::eos', self.stop_eos)
-        self.mainloop.quit()
         self.pipeline.send_event(Gst.Event.new_eos())
         try:
-            self.mainloop = GObject.MainLoop()
-            self.mainloop.run()
+            self.eosloop = GObject.MainLoop()
+            self.eosloop.run()
         except KeyboardInterrupt:
             log('INFO', 'EOS waiting is stopped by keyboard interrupt')
+        self.mainloop.quit()
+
+    def stop_eos(self, bus, msg):
+        log('INFO', 'EOS is received')
+        self.eosloop.quit()
+        self.bus.disconnect(self.sig_eos)
 
 rstream = RStream()
-rstream.run()
+rstream.start()

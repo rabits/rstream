@@ -6,16 +6,24 @@ rStream - IP video manager
 * Live & offset access
 
 ## Requirements:
+* GStreamer 1.0
+* GObject
 
 ## Streaming:
 * Save into h264 mp3 mpeg file:
-  ```gst-launch-1.0 -e rtspsrc location='rtsp://h264_uri' latency=0 name=d d. ! queue ! capsfilter caps="application/x-rtp,media=video" ! rtph264depay ! mpegtsmux name=mux ! filesink location=file.mp4 d. ! queue ! capsfilter caps="application/x-rtp,media=audio" ! decodebin ! audioconvert ! audioresample ! lamemp3enc ! mux.```
+  ```gst-launch-1.0 -e rtspsrc location='rtsp://h264_uri' latency=0 name=d \
+  d. ! queue ! capsfilter caps="application/x-rtp,media=video" ! rtph264depay ! mpegtsmux name=mux ! filesink location=file.mp4 \
+  d. ! queue ! capsfilter caps="application/x-rtp,media=audio" ! decodebin ! audioconvert ! audioresample ! lamemp3enc ! mux.```
 
 ## Info:
 ### Beward BD4330r
 * Video+Audio: rtsp://ip/h264
 * Video2+Audio: rtsp://ip/h264_2
 * Reboot: http://ip/cgi-bin/admin/restart.cgi?button=Reboot
+
+#### HW:
+* SOC: Ambarella A5s
+* UART: Can't find...
 
 ### Planet ICA-HM101
 * 1600x1200 90 Video+Audio: rtsp://ip/media.amp?streamprofile=Profile1
@@ -25,7 +33,7 @@ rStream - IP video manager
 * Reboot: http://ip/reboot.cgi
 
 #### HW:
-* CPU: Grain Media GM8125EL
+* SOC: Grain Media GM8125EL
 * UART: 38400 8N1 NOR (doc/planet_ica-hm101_uart.jpg)
 
 #### Hack:
