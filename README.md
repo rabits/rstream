@@ -7,7 +7,6 @@ rStream - IP video manager
 
 ## Requirements:
 * GStreamer 1.0
-* GObject
 
 ## Streaming:
 * Save into h264 mp3 mpeg file:

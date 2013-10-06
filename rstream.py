@@ -1,7 +1,8 @@
 #!/usr/bin/python
-'''rStream 0.7
+'''rStream 0.8
 
 Author:      Rabit <home@rabits.org>
+License:     GPL v3
 Description: Script get rtsp stream and save it to separated files
 
 Usage:
@@ -61,10 +62,11 @@ if( options['verbose'] == True ):
     import inspect
     def log(logtype, message):
         func = inspect.currentframe().f_back
+        log_time = time.time()
         if( logtype != "ERROR" ):
-            stdout.write('[%s %s, line:%u]: %s\n' % (time.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
+            stdout.write('[%s.%s %s, line:%03u]: %s\n' % (time.strftime('%H:%M:%S', time.localtime(log_time)), str(log_time % 1)[2:8], logtype, func.f_lineno, message))
         else:
-            stderr.write('[%s %s, line:%u]: %s\n' % (time.strftime('%H:%M:%S'), logtype, func.f_lineno, message))
+            stderr.write('[%s.%s %s, line:%03u]: %s\n' % (time.strftime('%H:%M:%S', time.localtime(log_time)), str(log_time % 1)[2:8], logtype, func.f_lineno, message))
 elif( options['verbose'] == False ):
     def log(logtype, message):
         if( logtype == "ERROR" ):
@@ -167,9 +169,8 @@ class RStream:
         self.bus.add_signal_watch()
 
         # Connecting common messages
-        #if( options['verbose'] == True ):
-        #    self.bus.connect('message', self.on_message)
         self.bus.connect('message::error', self.on_error)
+        self.sig_eos = None
 
         # Create elements
         self.src = Gst.ElementFactory.make('rtspsrc', None)
@@ -234,20 +235,33 @@ class RStream:
 
     def run(self):
         log('DEBUG', 'Running streaming')
+        if( self.sig_eos != None ):
+            self.bus.disconnect(self.sig_eos)
         self.sig_eos = self.bus.connect('message::eos', self.on_eos)
         self.mainloop = GObject.MainLoop()
-        self.pipeline.set_state(Gst.State.PLAYING)
-        # Check that pipeline is ok
-        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
-            log('DEBUG', 'Start receiving stream')
-            try:
-                self.mainloop.run()
-            except KeyboardInterrupt:
-                log('INFO', 'Received keyboard interrupt. Stopping streaming by EOS')
-                self.stop()
-        else:
-            log('ERROR', 'Couldn\'t receive stream')
-            self.reset()
+
+        # Try to connect 5 times before reset camera
+        for i in range(1, 6):
+            start_time = time.time()
+            self.pipeline.set_state(Gst.State.PLAYING)
+            # Check that pipeline is ok
+            if( self.pipeline.get_state(2 * i * Gst.SECOND)[1] == Gst.State.PLAYING ):
+                log('DEBUG', 'Start receiving stream')
+                try:
+                    self.mainloop.run()
+                except KeyboardInterrupt:
+                    log('INFO', 'Received keyboard interrupt. Stopping streaming by EOS')
+                    self.stop()
+                return
+            else:
+                end_time = time.time()
+                log('INFO', 'Couldn\'t receive stream, retrying...')
+                self.pipeline.set_state(Gst.State.NULL)
+                if( end_time - start_time < 2 * i ):
+                    time.sleep((start_time - end_time) + 2 * i)
+
+        log('ERROR', 'Couldn\'t receive stream, resetting device...')
+        self.reset()
 
     def on_pad_added(self, element, pad):
         string = pad.query_caps(None).to_string()
@@ -267,11 +281,6 @@ class RStream:
     def on_error(self, bus, msg):
         log('ERROR', 'Received error:' + ' '.join(map(str,msg.parse_error())))
         self.stop()
-
-    def on_message(self, bus, msg):
-        mtype = '_'.join(msg.type.__str__().split(' ')[1].lower().split('_')[2:])
-        message = ' '.join(map(str,getattr(msg,'parse_'+mtype)())) if ( hasattr(msg, 'parse_'+mtype) ) else 'unknown message'
-        log('DEBUG', 'Received ' + mtype + ':' + message)
 
     def reset(self):
         log('INFO', 'Resetting camera...')
@@ -311,22 +320,24 @@ class RStream:
 
     def stop(self):
         self.exit = True
-        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
-            self.eos()
+        self.eos()
         log('INFO', 'Cleaning gstreamer')
         self.pipeline.set_state(Gst.State.NULL)
         self.bus.remove_signal_watch()
 
     def eos(self):
-        log('DEBUG', 'Sending EOS')
-        self.bus.disconnect(self.sig_eos)
-        self.sig_eos = self.bus.connect('message::eos', self.stop_eos)
-        self.pipeline.send_event(Gst.Event.new_eos())
-        try:
-            self.eosloop = GObject.MainLoop()
-            self.eosloop.run()
-        except KeyboardInterrupt:
-            log('INFO', 'EOS waiting is stopped by keyboard interrupt')
+        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
+            log('DEBUG', 'Sending EOS')
+            self.bus.disconnect(self.sig_eos)
+            self.sig_eos = self.bus.connect('message::eos', self.stop_eos)
+            self.pipeline.send_event(Gst.Event.new_eos())
+            try:
+                self.eosloop = GObject.MainLoop()
+                self.eosloop.run()
+            except KeyboardInterrupt:
+                log('INFO', 'EOS waiting is stopped by keyboard interrupt')
+        else:
+            log('ERROR', 'Couldn\'t send EOS due to pipeline state is not playing')
         self.mainloop.quit()
 
     def stop_eos(self, bus, msg):
