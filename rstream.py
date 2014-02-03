@@ -1,9 +1,10 @@
 #!/usr/bin/python
-'''rStream 0.8
+'''rStream 0.9
 
 Author:      Rabit <home@rabits.org>
 License:     GPL v3
-Description: Script get rtsp stream and save it to separated files
+Description: Script get rtsp h264 video & audio stream and save it to separated files
+Required:    python-gi gir1.2-gstreamer-1.0 gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-alsa
 
 Usage:
   $ ./rstream.py --help
@@ -19,11 +20,9 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 
 # Init optparse
-parser = OptionParser(usage='usage: %prog [options] rtsp://url/h264', version=__doc__.split('\n', 1)[0])
-parser.add_option('-u', '--user', type='string', dest='user', metavar='USER',
-        default=None, help='http basic auth username [%default]')
-parser.add_option('-p', '--password', type='string', dest='password', metavar='PASSWORD',
-        default='', help='http basic auth password ["%default"]')
+parser = OptionParser(usage='usage: %prog [options] rtsp://<user>:<password>@<host>/h264', version=__doc__.split('\n', 1)[0])
+parser.add_option('-a', '--audio', type='string', dest='audio', metavar='DEV',
+        default=None, help='get audio stream from rtsp (="rtsp") source or ALSA card (="hw:<N>,<M>") (try to record with `arecord -D hw:1,0 -c 2 -f S16_LE -r 44100 test.wav`) [%default]')
 parser.add_option('-o', '--output-dir', type='string', dest='output-dir', metavar='DIR',
         default='out/%Y-%m-%d', help='autocreated output directory for files (accept `date` vars) ["%default"]')
 parser.add_option('-f', '--file-name', type='string', dest='file-name', metavar='NAME',
@@ -31,7 +30,7 @@ parser.add_option('-f', '--file-name', type='string', dest='file-name', metavar=
 parser.add_option('-d', '--duration-limit', type='int', dest='duration-limit', metavar='MIN',
         default=30, help='limit of video file duration in minutes (0 - no file cutting) [%default]')
 parser.add_option('-r', '--reset-url', type='string', dest='reset-url', metavar='URL',
-        default=None, help='get request will be sent to this url to resetting device [%default]')
+        default=None, help='get request will be sent to this url to resetting device (http://<user>:<password>@<host>/GET_restart) [%default]')
 parser.add_option('-l', '--log-file', type='string', dest='log-file', metavar='FILE',
         default=None, help='copy log output to file [%default]')
 parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
@@ -87,7 +86,7 @@ stream = args[0]
 
 class AudioEncoder(Gst.Bin):
     def __init__(self):
-        log('DEBUG', 'Init audio encoder')
+        log('INFO', 'Init audio encoder')
         super(AudioEncoder, self).__init__()
 
         # Create elements
@@ -115,10 +114,20 @@ class AudioEncoder(Gst.Bin):
 
         decode.connect('pad-added', self.on_new_decoded_pad)
 
-        # Add Ghost Pads
-        self.add_pad(
-            Gst.GhostPad.new('sink', q1.get_static_pad('sink'))
-        )
+        if options['audio'] != 'rtsp':
+            log('INFO', 'Trying to get ALSA card %s' % options['audio'])
+            alsa = Gst.ElementFactory.make('alsasrc', None)
+            self.add(alsa)
+            alsa.set_property('device', options['audio'])
+            log('INFO', 'Found card: %s, device: %s' % (alsa.get_property('card-name'), alsa.get_property('device-name')))
+            alsa.link(q1)
+        else:
+            log('INFO', 'Using rtsp source audio stream')
+            # Add Ghost Pads
+            self.add_pad(
+                Gst.GhostPad.new('sink', q1.get_static_pad('sink'))
+            )
+
         self.add_pad(
             Gst.GhostPad.new('src', q2.get_static_pad('src'))
         )
@@ -175,7 +184,6 @@ class RStream:
         # Create elements
         self.src = Gst.ElementFactory.make('rtspsrc', None)
         self.video = VideoEncoder()
-        self.audio = AudioEncoder()
         self.mux = Gst.ElementFactory.make('mp4mux', None)
         self.tee = Gst.ElementFactory.make('tee', None)
         self.sink = Gst.ElementFactory.make('filesink', None)
@@ -183,7 +191,6 @@ class RStream:
         # Add elements to pipeline
         self.pipeline.add(self.src)
         self.pipeline.add(self.video)
-        self.pipeline.add(self.audio)
         self.pipeline.add(self.mux)
         self.pipeline.add(self.tee)
         self.pipeline.add(self.sink)
@@ -199,9 +206,14 @@ class RStream:
 
         # Link elements
         self.video.link(self.mux)
-        self.audio.link(self.mux)
         self.mux.link(self.tee)
         self.tee.link(self.sink)
+
+        # Connecting audio
+        if options['audio'] != None:
+            self.audio = AudioEncoder()
+            self.pipeline.add(self.audio)
+            self.audio.link(self.mux)
 
         if options['duration-limit'] > 0:
             GObject.timeout_add(options['duration-limit'] * 60 * 1000, self.relocate)
@@ -242,6 +254,7 @@ class RStream:
 
         # Try to connect 5 times before reset camera
         for i in range(1, 6):
+            log('DEBUG', 'Try %d' % i)
             start_time = time.time()
             self.pipeline.set_state(Gst.State.PLAYING)
             # Check that pipeline is ok
@@ -258,6 +271,7 @@ class RStream:
                 log('INFO', 'Couldn\'t receive stream, retrying...')
                 self.pipeline.set_state(Gst.State.NULL)
                 if( end_time - start_time < 2 * i ):
+                    log('DEBUG', 'Sleeping %f sec...' % ((start_time - end_time) + 2 * i))
                     time.sleep((start_time - end_time) + 2 * i)
 
         log('ERROR', 'Couldn\'t receive stream, resetting device...')
@@ -289,9 +303,6 @@ class RStream:
         if( options['reset-url'] != None ):
             log('DEBUG', 'Send reset request...')
             request = urllib2.Request(options['reset-url'])
-            if( options['user'] != None ):
-                base64string = base64.encodestring('%s:%s' % (options['user'], options['password'])).replace('\n', '')
-                request.add_header('Authorization', 'Basic %s' % base64string)   
             try:
                 result = urllib2.urlopen(request)
                 result.close()
