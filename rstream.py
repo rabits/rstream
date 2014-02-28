@@ -1,5 +1,5 @@
 #!/usr/bin/python
-'''rStream 0.9
+'''rStream 0.95
 
 Author:      Rabit <home@rabits.org>
 License:     GPL v3
@@ -10,17 +10,27 @@ Usage:
   $ ./rstream.py --help
 '''
 
-from sys import stderr, stdout
-import os, time, urlparse
-import urllib2, base64
+from sys import stderr, stdout, exit as sysexit
+import os, time, urllib2, base64, urlparse
+
 from optparse import OptionParser
+import ConfigParser
 
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 
-# Init optparse
-parser = OptionParser(usage='usage: %prog [options] rtsp://<user>:<password>@<host>/h264', version=__doc__.split('\n', 1)[0])
+def exampleini(option, opt, value, parser):
+    print '[rstream]'
+    for key in parser.option_list:
+        if None not in [key.dest, key.type] and key.dest != 'config-file':
+            print '%s: %s' % (key.dest, key.default)
+    sysexit()
+
+# Parsing command line options
+parser = OptionParser(usage='%prog [options]', version=__doc__.split('\n', 1)[0])
+parser.add_option('-s', '--stream-from', type='string', dest='stream-from', metavar='URL',
+        default=None, help='rtsp url to get h264 video stream (rtsp://<user>:<password>@<host>/h264) (required)')
 parser.add_option('-a', '--audio', type='string', dest='audio', metavar='DEV',
         default=None, help='get audio stream from rtsp (="rtsp") source or ALSA card (="hw:<N>,<M>") (try to record with `arecord -D hw:1,0 -c 2 -f S16_LE -r 44100 test.wav`) [%default]')
 parser.add_option('-o', '--output-dir', type='string', dest='output-dir', metavar='DIR',
@@ -33,6 +43,10 @@ parser.add_option('-r', '--reset-url', type='string', dest='reset-url', metavar=
         default=None, help='get request will be sent to this url to resetting device (http://<user>:<password>@<host>/GET_restart) [%default]')
 parser.add_option('-l', '--log-file', type='string', dest='log-file', metavar='FILE',
         default=None, help='copy log output to file [%default]')
+parser.add_option('-c', '--config-file', type='string', dest='config-file', metavar='FILE',
+        default=None, help='get configuration from ini file (replaced by command line parameters) [%default]')
+parser.add_option('-e', '--config-example', action='callback', callback=exampleini,
+        default=None, help='print example ini config file to stdout')
 parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
         help='verbose mode - moar output to stdout')
 parser.add_option('-q', '--quiet', action='store_false', dest='verbose',
@@ -40,11 +54,31 @@ parser.add_option('-q', '--quiet', action='store_false', dest='verbose',
 (options, args) = parser.parse_args()
 options = vars(options)
 
-if len(args) != 1:
-    parser.error("incorrect number of arguments")
+# Parsing config file
+if options['config-file'] != None:
+    try:
+        config = ConfigParser.ConfigParser()
+        config.read(options['config-file'])
+
+        for key in parser.option_list:
+            if None not in [key.dest, key.type]:
+                if options[key.dest] is key.default:
+                    try:
+                        if key.type in ['int', 'float', 'boolean']:
+                            val = getattr(config, 'get%s' % key.type)('rstream', key.dest)
+                        else:
+                            val = config.get('rstream', key.dest)
+                        options[key.dest] = val
+                    except ConfigParser.NoOptionError:
+                        continue
+    except:
+        parser.error('Error while parse config file. Please specify header and available options')
+
+if options['stream-from'] == None:
+    parser.error('Unable to get source stream without stream-from option')
 
 # LOGGING
-if( options['log-file'] != None ):
+if options['log-file'] != None:
     class Tee(object):
         def __init__(self, *files):
             self.files = files
@@ -57,23 +91,23 @@ if( options['log-file'] != None ):
     stdout = Tee(stdout, logfile)
     stderr = Tee(stderr, logfile)
 
-if( options['verbose'] == True ):
+if options['verbose'] == True:
     import inspect
     def log(logtype, message):
         func = inspect.currentframe().f_back
         log_time = time.time()
-        if( logtype != "ERROR" ):
+        if logtype != "ERROR":
             stdout.write('[%s.%s %s, line:%03u]: %s\n' % (time.strftime('%H:%M:%S', time.localtime(log_time)), str(log_time % 1)[2:8], logtype, func.f_lineno, message))
         else:
             stderr.write('[%s.%s %s, line:%03u]: %s\n' % (time.strftime('%H:%M:%S', time.localtime(log_time)), str(log_time % 1)[2:8], logtype, func.f_lineno, message))
-elif( options['verbose'] == False ):
+elif options['verbose'] == False:
     def log(logtype, message):
-        if( logtype == "ERROR" ):
+        if logtype == "ERROR":
             stderr.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
 else:
     def log(logtype, message):
-        if( logtype != "DEBUG" ):
-            if( logtype != "ERROR" ):
+        if logtype != "DEBUG":
+            if logtype != "ERROR":
                 stdout.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
             else:
                 stderr.write('[%s %s]: %s\n' % (time.strftime('%H:%M:%S'), logtype, message))
@@ -81,8 +115,6 @@ else:
 # Init gstreamer
 GObject.threads_init()
 Gst.init(None)
-
-stream = args[0]
 
 class AudioEncoder(Gst.Bin):
     def __init__(self):
@@ -196,7 +228,7 @@ class RStream:
         self.pipeline.add(self.sink)
 
         # Set properties
-        self.src.set_property('location', stream)
+        self.src.set_property('location', options['stream-from'])
         self.src.set_property('latency', 0)
         self.sink.set_property('location', self.outputPath())
         self.mux.set_property('streamable', True)
@@ -235,19 +267,19 @@ class RStream:
     def outputPath(self):
         path = time.strftime(os.path.join(options['output-dir'], options['file-name'])) + '.mp4'
         directory = os.path.dirname(path)
-        if( not os.path.exists(directory) ):
+        if not os.path.exists(directory):
             os.makedirs(directory)
-        if( not os.path.isdir(directory) ):
+        if not os.path.isdir(directory):
             log('ERROR', 'Cant create output directory "%s"' % directory)
         return path
 
     def start(self):
-        while( self.exit != True ):
+        while self.exit != True:
             self.run()
 
     def run(self):
         log('DEBUG', 'Running streaming')
-        if( self.sig_eos != None ):
+        if self.sig_eos != None:
             self.bus.disconnect(self.sig_eos)
         self.sig_eos = self.bus.connect('message::eos', self.on_eos)
         self.mainloop = GObject.MainLoop()
@@ -258,7 +290,7 @@ class RStream:
             start_time = time.time()
             self.pipeline.set_state(Gst.State.PLAYING)
             # Check that pipeline is ok
-            if( self.pipeline.get_state(2 * i * Gst.SECOND)[1] == Gst.State.PLAYING ):
+            if self.pipeline.get_state(2 * i * Gst.SECOND)[1] == Gst.State.PLAYING:
                 log('DEBUG', 'Start receiving stream')
                 try:
                     self.mainloop.run()
@@ -270,7 +302,7 @@ class RStream:
                 end_time = time.time()
                 log('INFO', 'Couldn\'t receive stream, retrying...')
                 self.pipeline.set_state(Gst.State.NULL)
-                if( end_time - start_time < 2 * i ):
+                if end_time - start_time < 2 * i:
                     log('DEBUG', 'Sleeping %f sec...' % ((start_time - end_time) + 2 * i))
                     time.sleep((start_time - end_time) + 2 * i)
 
@@ -300,22 +332,28 @@ class RStream:
         log('INFO', 'Resetting camera...')
         # TODO: send email about resetting
         self.pipeline.set_state(Gst.State.NULL)
-        if( options['reset-url'] != None ):
+        if options['reset-url'] != None:
             log('DEBUG', 'Send reset request...')
+            url = urlparse.urlparse(options['reset-url'])
             request = urllib2.Request(options['reset-url'])
+            auth = None
+            if url.username or url.password:
+                auth = base64.encodestring('%s:%s' % (url.username, url.password)).replace('\n', '')
+                request.add_header("Authorization", "Basic %s" % auth)
             try:
                 result = urllib2.urlopen(request)
                 result.close()
-                if( result.getcode() == 200 ):
+                if result.getcode() == 200:
                     log('INFO', 'Waiting till camera is up...')
-                    url = urlparse.urlparse(options['reset-url'])
                     request = urllib2.Request(urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
-                    while( True ):
+                    if auth:
+                        request.add_header("Authorization", "Basic %s" % auth)
+                    while True:
                         try:
                             log('DEBUG', 'Trying connect to %s' % urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
                             result = urllib2.urlopen(request, None, 1)
                             result.close()
-                            if( result.getcode() == 200 ):
+                            if result.getcode() == 200:
                                 log('INFO', 'Reset complete!')
                                 return
                             else:
@@ -323,6 +361,8 @@ class RStream:
                         except:
                             log('INFO', '  waiting...')
                         time.sleep(1)
+                else:
+                    log('ERROR', 'Request result is not ok: %s %s' % (result.getcode(), result.info()))
             except urllib2.URLError:
                 log('ERROR', 'Can\'t request camera reset')
 
@@ -337,7 +377,7 @@ class RStream:
         self.bus.remove_signal_watch()
 
     def eos(self):
-        if( self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING ):
+        if self.pipeline.get_state(2 * Gst.SECOND)[1] == Gst.State.PLAYING:
             log('DEBUG', 'Sending EOS')
             self.bus.disconnect(self.sig_eos)
             self.sig_eos = self.bus.connect('message::eos', self.stop_eos)

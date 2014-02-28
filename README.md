@@ -4,7 +4,7 @@ rStream - IP video manager
 ## Advantages:
 * Storage of captured video
 * Live & offset access
-* Audio disabled, from rtsp or ALSA hw device
+* Audio streaming options: disabled, from rtsp or ALSA hw device
 * Support http basic auth by login & password inside url's
 
 ## Required:
