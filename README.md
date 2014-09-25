@@ -1,13 +1,22 @@
 rStream - IP video manager
 ==========================
 
-## Advantages:
+This script can stream RTSP video from remote server to your video storage
+
+Features:
+---------
 * Storage of captured video
 * Live & offset access
 * Audio streaming options: disabled, from rtsp or ALSA hw device
 * Support http basic auth by login & password inside url's
+* Result streaming copy to local machine address:port
 
-## Required:
+TODO:
+-----
+* Copy stream to localhost
+
+Requirements:
+-------------
 * python-gi
 * gir1.2-gstreamer-1.0
 * gstreamer1.0-libav
@@ -17,13 +26,24 @@ rStream - IP video manager
 * gstreamer1.0-plugins-ugly
 * gstreamer1.0-alsa
 
-## Streaming:
-* Save into h264 mp3 mpeg file:
-  ```gst-launch-1.0 -e rtspsrc location='rtsp://h264_uri' latency=0 name=d \
-  d. ! queue ! capsfilter caps="application/x-rtp,media=video" ! rtph264depay ! mpegtsmux name=mux ! filesink location=file.mp4 \
-  d. ! queue ! capsfilter caps="application/x-rtp,media=audio" ! decodebin ! audioconvert ! audioresample ! lamemp3enc ! mux.```
+Support:
+--------
+You can support my open-source development by a small Bitcoin donation.
 
-## Info:
+My bitcoin wallet: `15phQNwkVs3fXxvxzBkhuhXA2xoKikPfUy`
+
+Streaming:
+----------
+* Save into h264 mp3 mpeg file:
+
+  ```sh
+  gst-launch-1.0 -e rtspsrc location='rtsp://h264_uri' latency=0 name=d \
+    d. ! queue ! capsfilter caps="application/x-rtp,media=video" ! rtph264depay ! mpegtsmux name=mux ! filesink location=file.mp4 \
+    d. ! queue ! capsfilter caps="application/x-rtp,media=audio" ! decodebin ! audioconvert ! audioresample ! lamemp3enc ! mux.
+  ```
+
+Info:
+-----
 ### Beward BD4330r
 * Video+Audio: rtsp://ip/h264
 * Video2+Audio: rtsp://ip/h264_2
