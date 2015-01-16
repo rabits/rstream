@@ -1,5 +1,6 @@
 #!/usr/bin/python
-'''rStream 0.95
+# -*- coding: UTF-8 -*-
+'''rStream 1.0
 
 Author:      Rabit <home@rabits.org>
 License:     GPL v3
@@ -20,6 +21,10 @@ import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 
+if os.geteuid() == 0:
+    stderr.write("ERROR: rStream is running by the root user, but this is really dangerous! Please use unprivileged user.\n")
+    sysexit()
+
 def exampleini(option, opt, value, parser):
     print '[rstream]'
     for key in parser.option_list:
@@ -31,6 +36,8 @@ def exampleini(option, opt, value, parser):
 parser = OptionParser(usage='%prog [options]', version=__doc__.split('\n', 1)[0])
 parser.add_option('-s', '--stream-from', type='string', dest='stream-from', metavar='URL',
         default=None, help='rtsp url to get h264 video stream (rtsp://<user>:<password>@<host>/h264) (required)')
+parser.add_option('-t', '--stream-to', type='string', dest='stream-to', metavar='HOST:PORT',
+        default=None, help='enable udp stream forwarding to specified address and port [%default]')
 parser.add_option('-a', '--audio', type='string', dest='audio', metavar='DEV',
         default=None, help='get audio stream from rtsp (="rtsp") source or ALSA card (="hw:<N>,<M>") (try to record with `arecord -D hw:1,0 -c 2 -f S16_LE -r 44100 test.wav`) [%default]')
 parser.add_option('-o', '--output-dir', type='string', dest='output-dir', metavar='DIR',
@@ -76,6 +83,14 @@ if options['config-file'] != None:
 
 if options['stream-from'] == None:
     parser.error('Unable to get source stream without stream-from option')
+
+if options['stream-to'] != None:
+    if options['stream-to'].find(':') == -1:
+        parser.error('Unable to find separator in stream-to (value "%s")' % options['stream-to'])
+    elif options['stream-to'].split(':')[0] == '':
+        parser.error('HOST name or address in stream-to (value "%s") is empty' % options['stream-to'])
+    elif options['stream-to'].split(':')[1].isdigit() == False or 1025 > long(options['stream-to'].split(':')[1]) > 65535:
+        parser.error('PORT in stream-to (value "%s") is not a number or not in range (1025...65535)' % options['stream-to'])
 
 # LOGGING
 if options['log-file'] != None:
@@ -125,23 +140,20 @@ class AudioEncoder(Gst.Bin):
         q1 = Gst.ElementFactory.make('queue', None)
         decode = Gst.ElementFactory.make('decodebin', None)
         self.convert = Gst.ElementFactory.make('audioconvert', None)
-        resample = Gst.ElementFactory.make('audioresample', None)
-        enc = Gst.ElementFactory.make('lamemp3enc', None)
+        enc = Gst.ElementFactory.make('voaacenc', None)
         q2 = Gst.ElementFactory.make('queue', None)
 
         # Add elements to Bin
         self.add(q1)
         self.add(decode)
         self.add(self.convert)
-        self.add(resample)
         self.add(enc)
         self.add(q2)
 
         # Link elements
         q1.link(decode)
         # skip decode convert link - add it only on new pad added
-        self.convert.link(resample)
-        resample.link(enc)
+        self.convert.link(enc)
         enc.link(q2)
 
         decode.connect('pad-added', self.on_new_decoded_pad)
@@ -151,6 +163,8 @@ class AudioEncoder(Gst.Bin):
             alsa = Gst.ElementFactory.make('alsasrc', None)
             self.add(alsa)
             alsa.set_property('device', options['audio'])
+            # Disabling of provide-clock required for gstreamer on ubuntu 12.10
+            alsa.set_property('provide-clock', False)
             log('INFO', 'Found card: %s, device: %s' % (alsa.get_property('card-name'), alsa.get_property('device-name')))
             alsa.link(q1)
         else:
@@ -216,36 +230,81 @@ class RStream:
         # Create elements
         self.src = Gst.ElementFactory.make('rtspsrc', None)
         self.video = VideoEncoder()
+        self.vtee = Gst.ElementFactory.make('tee', None)
+        self.vqueue = Gst.ElementFactory.make('queue', None)
         self.mux = Gst.ElementFactory.make('mp4mux', None)
-        self.tee = Gst.ElementFactory.make('tee', None)
-        self.sink = Gst.ElementFactory.make('filesink', None)
+        self.filesink = Gst.ElementFactory.make('filesink', None)
 
         # Add elements to pipeline
         self.pipeline.add(self.src)
         self.pipeline.add(self.video)
+        self.pipeline.add(self.vtee)
+        self.pipeline.add(self.vqueue)
         self.pipeline.add(self.mux)
-        self.pipeline.add(self.tee)
-        self.pipeline.add(self.sink)
+        self.pipeline.add(self.filesink)
 
         # Set properties
         self.src.set_property('location', options['stream-from'])
         self.src.set_property('latency', 0)
-        self.sink.set_property('location', self.outputPath())
+        self.filesink.set_property('location', self.outputPath())
+        self.mux.set_property('fragment-duration', 1000)
         self.mux.set_property('streamable', True)
 
         # Connect signal handlers
         self.src.connect('pad-added', self.on_pad_added)
 
         # Link elements
-        self.video.link(self.mux)
-        self.mux.link(self.tee)
-        self.tee.link(self.sink)
+        self.video.link(self.vtee)
+        self.vtee.link(self.vqueue)
+        self.vqueue.link(self.mux)
+        self.mux.link(self.filesink)
 
         # Connecting audio
         if options['audio'] != None:
             self.audio = AudioEncoder()
+            self.atee = Gst.ElementFactory.make('tee', None)
+            self.aqueue = Gst.ElementFactory.make('queue', None)
             self.pipeline.add(self.audio)
-            self.audio.link(self.mux)
+            self.pipeline.add(self.atee)
+            self.pipeline.add(self.aqueue)
+            self.audio.link(self.atee)
+            self.atee.link(self.aqueue)
+            self.aqueue.link(self.mux)
+
+        # Connecting updsink
+        if options['stream-to'] != None:
+            log('DEBUG', 'Connecting video RTP proxy to %s' % options['stream-to'])
+            (host, port) = options['stream-to'].split(':')
+
+            # Video stream
+            self.vudpsinkqueue = Gst.ElementFactory.make('queue', None)
+            self.vudpsinkpay = Gst.ElementFactory.make('rtph264pay', None)
+            self.vudpsink = Gst.ElementFactory.make('udpsink', None)
+            self.pipeline.add(self.vudpsinkqueue)
+            self.pipeline.add(self.vudpsinkpay)
+            self.pipeline.add(self.vudpsink)
+            #self.vudpsink.set_property('sync', False)
+            self.vudpsinkpay.set_property('config-interval', 1)
+            self.vudpsink.set_property('host', host)
+            self.vudpsink.set_property('port', long(port))
+            self.vtee.link(self.vudpsinkqueue)
+            self.vudpsinkqueue.link(self.vudpsinkpay)
+            self.vudpsinkpay.link(self.vudpsink)
+
+            if options['audio'] != None:
+                log('DEBUG', 'Connecting audio RTP proxy to %s' % options['stream-to'])
+                self.audpsinkqueue = Gst.ElementFactory.make('queue', None)
+                self.audpsinkpay = Gst.ElementFactory.make('rtpmp4apay', None)
+                self.audpsink = Gst.ElementFactory.make('udpsink', None)
+                self.pipeline.add(self.audpsinkqueue)
+                self.pipeline.add(self.audpsinkpay)
+                self.pipeline.add(self.audpsink)
+                self.audpsinkpay.set_property('pt', 97)
+                self.audpsink.set_property('host', host)
+                self.audpsink.set_property('port', long(port)+2)
+                self.atee.link(self.audpsinkqueue)
+                self.audpsinkqueue.link(self.audpsinkpay)
+                self.audpsinkpay.link(self.audpsink)
 
         if options['duration-limit'] > 0:
             GObject.timeout_add(options['duration-limit'] * 60 * 1000, self.relocate)
@@ -257,11 +316,11 @@ class RStream:
         GObject.timeout_add(options['duration-limit'] * 60 * 1000, self.relocate)
 
     def location(self, filename):
-        log('INFO', 'Change sink location to %s' % filename)
+        log('INFO', 'Change filesink location to %s' % filename)
         self.pipeline.set_state(Gst.State.NULL)
-        self.tee.unlink(self.sink)
-        self.sink.set_property('location', filename)
-        self.tee.link(self.sink)
+        self.mux.unlink(self.filesink)
+        self.filesink.set_property('location', filename)
+        self.mux.link(self.filesink)
         self.pipeline.set_state(Gst.State.READY)
 
     def outputPath(self):
@@ -335,22 +394,25 @@ class RStream:
         if options['reset-url'] != None:
             log('DEBUG', 'Send reset request...')
             url = urlparse.urlparse(options['reset-url'])
-            request = urllib2.Request(options['reset-url'])
             auth = None
-            if url.username or url.password:
-                auth = base64.encodestring('%s:%s' % (url.username, url.password)).replace('\n', '')
-                request.add_header("Authorization", "Basic %s" % auth)
+            if url.username and url.password:
+                auth = {'Authorization':'Basic %s' % base64.encodestring('%s:%s' % (url.username, url.password)).replace('\n', '')}
+                url = url._replace(netloc=url.netloc.replace('%s:%s@' % (url.username, url.password), ''))
+
+            request = urllib2.Request(urlparse.urlunparse(url), headers=auth)
             try:
                 result = urllib2.urlopen(request)
+                log('DEBUG', 'URL opened')
                 result.close()
                 if result.getcode() == 200:
                     log('INFO', 'Waiting till camera is up...')
-                    request = urllib2.Request(urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
+                    url = urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', ''))
+                    request = urllib2.Request(url)
                     if auth:
                         request.add_header("Authorization", "Basic %s" % auth)
                     while True:
                         try:
-                            log('DEBUG', 'Trying connect to %s' % urlparse.urlunparse((url.scheme, url.netloc, '/', '', '', '')))
+                            log('DEBUG', 'Trying connect to %s' % url)
                             result = urllib2.urlopen(request, None, 1)
                             result.close()
                             if result.getcode() == 200:
@@ -363,7 +425,7 @@ class RStream:
                         time.sleep(1)
                 else:
                     log('ERROR', 'Request result is not ok: %s %s' % (result.getcode(), result.info()))
-            except urllib2.URLError:
+            except:
                 log('ERROR', 'Can\'t request camera reset')
 
         log('ERROR', 'Camera need to reset, but I can\'t do this. Quitting.')

@@ -7,13 +7,14 @@ Features:
 ---------
 * Storage of captured video
 * Live & offset access
-* Audio streaming options: disabled, from rtsp or ALSA hw device
+* Audio streaming options: disabled, from rtsp or ALSA device
 * Support http basic auth by login & password inside url's
 * Result streaming copy to local machine address:port
+* Proxy rtp stream to host
 
 TODO:
 -----
-* Copy stream to localhost
+* Split proxy & archive functions
 
 Requirements:
 -------------
